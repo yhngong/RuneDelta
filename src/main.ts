@@ -27,6 +27,7 @@ import {
   createStartingInventory
 } from './constants';
 import {
+  drawAttackSlashEffect,
   drawBrokenSoul,
   drawBullet,
   drawPartyMemberSprite,
@@ -92,12 +93,12 @@ const ALL_PRACTICE_PATTERNS: AttackPatternId[] = [
 ];
 
 const PARTY_SPRITE_POS: Array<{ x: number; y: number }> = [
-  { x: 108, y: 112 },
-  { x: 92, y: 188 },
-  { x: 108, y: 264 }
+  { x: 124, y: 118 },
+  { x: 106, y: 188 },
+  { x: 120, y: 256 }
 ];
 
-const KNIGHT_POS = { x: 506, y: 170 };
+const KNIGHT_POS = { x: 502, y: 162 };
 
 class RuneDeltaGame {
   private canvas: HTMLCanvasElement;
@@ -130,7 +131,7 @@ class RuneDeltaGame {
     splitAxis: 'none',
     splitGap: 0,
     targetSplitGap: 0,
-    borderColor: '#33ff55',
+    borderColor: '#00c800',
     rotation: 0
   };
 
@@ -181,6 +182,13 @@ class RuneDeltaGame {
   private dialogueCharAccum = 0;
 
   private popups: FloatingPopup[] = [];
+  private knightSlashBursts: Array<{
+    x: number;
+    y: number;
+    progress: number;
+    color: string;
+    isCrit: boolean;
+  }> = [];
   private swoonSlashBannerTimer = 0;
   private enemyIntroTimer = 0;
   private stateElapsed = 0;
@@ -246,6 +254,7 @@ class RuneDeltaGame {
     this.soul.holdBreathActive = false;
     this.soul.invulnTimer = 0;
     this.popups = [];
+    this.knightSlashBursts = [];
     this.rudeBolt.active = false;
     this.swoonSlashBannerTimer = 0;
 
@@ -914,11 +923,18 @@ class RuneDeltaGame {
 
     sound.playSfx(isCrit ? 'crit_slash' : 'slash');
     sound.playSfx('knight_hurt');
+    this.knightSlashBursts.push({
+      x: KNIGHT_POS.x + (lane.actorIndex - 1) * 10,
+      y: KNIGHT_POS.y - 10 + (lane.actorIndex - 1) * 14,
+      progress: 0,
+      color: isCrit ? '#ffff00' : actor.color,
+      isCrit
+    });
     this.spawnPopup(
       KNIGHT_POS.x - 16 + (Math.random() - 0.5) * 26,
       KNIGHT_POS.y - 45 + lane.actorIndex * 18,
       `${dmg}`,
-      isCrit ? '#ffe64d' : actor.color,
+      isCrit ? '#ffff00' : actor.color,
       isCrit ? 1.25 : 1.0
     );
   }
@@ -982,7 +998,13 @@ class RuneDeltaGame {
       this.knight.pose = this.knight.phase4Completed ? 'cracked' : 'idle';
     }
 
-    // Update floating damage/heal popups
+    // Update floating damage/heal popups & slash bursts
+    for (let i = this.knightSlashBursts.length - 1; i >= 0; i--) {
+      this.knightSlashBursts[i].progress += dt * 3.8;
+      if (this.knightSlashBursts[i].progress >= 1) {
+        this.knightSlashBursts.splice(i, 1);
+      }
+    }
     for (let i = this.popups.length - 1; i >= 0; i--) {
       const p = this.popups[i];
       p.y += p.vy * dt;
@@ -1369,6 +1391,11 @@ class RuneDeltaGame {
     const ky = isRoaring ? 74 : KNIGHT_POS.y;
     drawRoaringKnight(ctx, this.knight, kx, ky, this.globalTime);
 
+    // Draw FIGHT weapon slash bursts across the Knight
+    for (const sb of this.knightSlashBursts) {
+      drawAttackSlashEffect(ctx, sb.x, sb.y, sb.progress, sb.color, sb.isCrit);
+    }
+
     // Draw Rude Buster Bolt if active
     drawRudeBusterBolt(ctx, this.rudeBolt);
 
@@ -1481,7 +1508,7 @@ class RuneDeltaGame {
     drawBattleBackground(ctx, this.globalTime, false);
 
     // Hovering Roaring Knight centerpiece
-    drawRoaringKnight(ctx, this.knight, SCREEN_WIDTH / 2, 165, this.globalTime);
+    drawRoaringKnight(ctx, this.knight, SCREEN_WIDTH / 2, 168, this.globalTime);
 
     // Title Logo
     ctx.save();
@@ -1492,22 +1519,18 @@ class RuneDeltaGame {
     ctx.fillStyle = '#ffffff';
     ctx.fillText('RUNEDELTA', SCREEN_WIDTH / 2, 53);
 
-    ctx.font = '21px "VT323", monospace';
+    ctx.font = '22px "VT323", monospace';
     ctx.fillStyle = '#c084fc';
-    ctx.fillText(
-      'DELTARUNE CHAPTER 3 — THE ROARING KNIGHT BOSS RECREATION',
-      SCREEN_WIDTH / 2,
-      80
-    );
+    ctx.fillText('THE ROARING KNIGHT BOSS RECREATION', SCREEN_WIDTH / 2, 80);
 
-    // Menu Box
-    const bx = 130;
-    const by = 286;
-    const bw = SCREEN_WIDTH - 260;
-    const bh = 136;
-    ctx.fillStyle = 'rgba(5, 2, 12, 0.92)';
+    // Authentic Deltarune Menu Box
+    const bx = 136;
+    const by = 292;
+    const bw = SCREEN_WIDTH - 272;
+    const bh = 134;
+    ctx.fillStyle = '#000000';
     ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = '#6d28d9';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.strokeRect(bx, by, bw, bh);
 
@@ -1522,20 +1545,20 @@ class RuneDeltaGame {
       const oy = by + 36 + idx * 36;
       const selected = this.titleCursor === idx;
       if (selected) {
-        drawSoulHeart(ctx, bx + 28, oy - 6, 0.85, '#ff0022');
+        drawSoulHeart(ctx, bx + 28, oy - 6, 0.85, '#ff0000');
       }
       ctx.font = 'bold 12px "Press Start 2P", monospace';
-      ctx.fillStyle = selected ? '#ffe659' : '#e9d5ff';
-      ctx.fillText(opt, bx + 52, oy);
+      ctx.fillStyle = selected ? '#ffff00' : '#ffffff';
+      ctx.fillText(opt, bx + 50, oy);
     });
 
     ctx.textAlign = 'center';
     ctx.font = '18px "VT323", monospace';
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = '#8b9bb8';
     ctx.fillText(
-      'Starts w/ 4x ReviveMint, 3x SpinCake, 3x TopCake • Authentic Ch.3 Stats & All 4 Phases',
+      '[Arrows] Move   •   [Z / Enter] Confirm   •   [X / Shift] Cancel / Slow   •   [M] Mute',
       SCREEN_WIDTH / 2,
-      454
+      456
     );
     ctx.restore();
   }

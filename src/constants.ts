@@ -159,8 +159,8 @@ export function createParty(shadowMantleHolder: PartyId = 'susie'): PartyMember[
     {
       id: 'kris',
       name: 'KRIS',
-      color: '#00f0ff',
-      hpBarColor: '#00c8ff',
+      color: '#00ffff',
+      hpBarColor: '#00ff00',
       baseHp: 160,
       maxHp: 160,
       hp: 160,
@@ -179,8 +179,8 @@ export function createParty(shadowMantleHolder: PartyId = 'susie'): PartyMember[
     {
       id: 'susie',
       name: 'SUSIE',
-      color: '#ff55ff',
-      hpBarColor: '#ea00ea',
+      color: '#ff00ff',
+      hpBarColor: '#00ff00',
       baseHp: 190,
       maxHp: 190,
       hp: 190,
@@ -199,8 +199,8 @@ export function createParty(shadowMantleHolder: PartyId = 'susie'): PartyMember[
     {
       id: 'ralsei',
       name: 'RALSEI',
-      color: '#55ff66',
-      hpBarColor: '#00e640',
+      color: '#00ff00',
+      hpBarColor: '#00ff00',
       baseHp: 140,
       maxHp: 140,
       hp: 140,

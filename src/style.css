@@ -10,7 +10,7 @@ html,
 body {
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at center, #0e0718 0%, #030106 70%, #000000 100%);
+  background: #000000;
   color: #ffffff;
   font-family: 'VT323', 'Courier New', monospace;
   overflow: hidden;
@@ -20,56 +20,16 @@ body {
   width: 100vw;
   height: 100vh;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.frame-shell {
-  position: relative;
-  display: flex;
   align-items: center;
   justify-content: center;
   background: #000000;
-  border: 3px solid #2b1d42;
-  box-shadow:
-    0 0 0 2px #090410,
-    0 0 42px rgba(145, 58, 255, 0.25),
-    0 0 90px rgba(0, 0, 0, 0.95);
 }
 
 #game-canvas {
   display: block;
-  width: min(94vw, calc((100vh - 54px) * (4 / 3)));
-  height: min(calc(94vw * 0.75), calc(100vh - 54px));
-  max-width: 1120px;
-  max-height: 840px;
+  width: min(100vw, calc(100vh * (4 / 3)));
+  height: min(calc(100vw * 0.75), 100vh);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000000;
-}
-
-.controls-bar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 18px;
-  font-family: 'VT323', monospace;
-  font-size: 18px;
-  letter-spacing: 0.5px;
-  color: #a395be;
-}
-
-.controls-bar kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 10px;
-  color: #f3eaff;
-  background: #1a1128;
-  border: 1px solid #593d88;
-  border-bottom-width: 2px;
-  border-radius: 3px;
-  margin-right: 2px;
 }

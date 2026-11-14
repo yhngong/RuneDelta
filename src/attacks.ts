@@ -70,7 +70,7 @@ export class AttackController {
     box.splitGap = 0;
     box.targetSplitGap = 0;
     box.rotation = 0;
-    box.borderColor = patternId === 'roaring_final' ? '#ffffff' : '#33ff55';
+    box.borderColor = patternId === 'roaring_final' ? '#ffffff' : '#00c800';
 
     soul.x = box.cx;
     soul.y = box.cy;
@@ -993,7 +993,21 @@ export class AttackController {
     const hh = box.height * 0.5;
     const gap = box.splitGap * 0.5;
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
+    // Iconic Deltarune expanding wireframe echo rings when the Bullet Board zooms in!
+    if (Math.abs(box.targetWidth - box.width) > 4) {
+      for (let e = 1; e <= 3; e++) {
+        const s = 1 - e * 0.16;
+        if (s <= 0.1) continue;
+        ctx.save();
+        ctx.globalAlpha = 0.35 / e;
+        ctx.strokeStyle = box.borderColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-hw * s, -hh * s, box.width * s, box.height * s);
+        ctx.restore();
+      }
+    }
+
+    ctx.fillStyle = '#000000';
     ctx.strokeStyle = box.borderColor;
     ctx.lineWidth = 4;
 
