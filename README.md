@@ -40,7 +40,7 @@ npm run preview
 * **3x TopCake**: Restores **160 HP** to all conscious/`DOWN` allies.
 
 ### Party Stats (LV 3 + Chapter 3 Equipment)
-*(Note: You can swap who wears the **ShadowMantle** in the Title Screen's `PARTY STATS & MANTLE` menu; defaults to Susie.)*
+*(Note: You can swap who wears the **ShadowMantle** in the Title Screen's `PARTY STATS` menu; defaults to Susie.)*
 
 | Member | Max HP | Base AT / DF / MAG | Equipped Gear | Total AT / DF / MAG | Unique Mechanics |
 | :--- | :---: | :---: | :--- | :---: | :--- |

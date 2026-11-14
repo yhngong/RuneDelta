@@ -1512,8 +1512,8 @@ class RuneDeltaGame {
     ctx.strokeRect(bx, by, bw, bh);
 
     const options = [
-      'START CANONICAL FIGHT',
-      `PARTY STATS & MANTLE (${this.shadowMantleHolder.toUpperCase()})`,
+      'FIGHT',
+      'PARTY STATS',
       'PRACTICE SPECIFIC ATTACK'
     ];
 
