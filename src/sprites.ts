@@ -539,15 +539,11 @@ function getKnightBitmap(
       if (ch === '.') continue;
       if (ch === 'W') {
         octx.fillStyle = '#ffffff';
-      } else {
-        octx.fillStyle =
-          variant === 'hurt'
-            ? '#525266'
-            : variant === 'ghost'
-              ? 'rgba(0, 0, 0, 0.35)'
-              : '#000000';
+        octx.fillRect(c, r, 1, 1);
+      } else if (variant !== 'ghost') {
+        octx.fillStyle = variant === 'hurt' ? '#525266' : '#000000';
+        octx.fillRect(c, r, 1, 1);
       }
-      octx.fillRect(c, r, 1, 1);
     }
   }
 
@@ -573,13 +569,13 @@ export function drawRoaringKnight(
             ? 'roar'
             : 'idle';
 
-  // 1. Monochrome white-outline ghost afterimages trailing behind the exact 68x65 sprite!
-  for (let i = 3; i >= 1; i--) {
-    const lag = i * 0.12;
-    const ax = x + Math.sin((time - lag) * 2.1) * 6 + i * 5;
-    const ay = y + Math.sin((time - lag) * 3.2) * 7;
+  // 1. Six tightly-spaced vibrating white-wireframe fan echoes (matching yt_sd2.jpg!)
+  for (let i = 6; i >= 1; i--) {
+    const lag = i * 0.055;
+    const ax = x + Math.sin((time - lag) * 2.4) * 4 + i * 4.5;
+    const ay = y + Math.sin((time - lag) * 3.5) * 5 - i * 1.8;
     ctx.save();
-    ctx.globalAlpha = 0.24 / i;
+    ctx.globalAlpha = 0.38 * (1 - i / 7.5);
     drawKnightPixelSprite(ctx, frameKey, 'ghost', ax, ay, knight, time - lag, true);
     ctx.restore();
   }
@@ -703,36 +699,108 @@ export function drawAttackSlashEffect(
   ctx.restore();
 }
 
+export function drawMiniActionGlyph(
+  ctx: CanvasRenderingContext2D,
+  actionType: 'FIGHT' | 'ACT' | 'MAGIC' | 'ITEM' | 'DEFEND',
+  x: number,
+  y: number,
+  color: string
+): void {
+  let glyph: string[];
+  if (actionType === 'FIGHT') {
+    glyph = [
+      '.......xx',
+      '......xxx',
+      '.....xxx.',
+      '....xxx..',
+      '.x.xxx...',
+      '..xxx....',
+      '.xx.x....',
+      'xx.......'
+    ];
+  } else if (actionType === 'MAGIC') {
+    glyph = [
+      '...xx....',
+      '..xxxx...',
+      '.xx..xx..',
+      '.xx.x.xx.',
+      '..xxxxx..',
+      '...xxx...',
+      '....x....',
+      '.........'
+    ];
+  } else if (actionType === 'ITEM') {
+    glyph = [
+      '..xxxx...',
+      '...xx....',
+      '.xxxxxx..',
+      'xxxxxxxx.',
+      'xxx..xxx.',
+      '.xxxxxx..',
+      '..xxxx...',
+      '.........'
+    ];
+  } else if (actionType === 'DEFEND') {
+    glyph = [
+      '.xxxxxxx.',
+      'xxxxxxxxx',
+      'xx..x..xx',
+      '.xxxxxxx.',
+      '..xxxxx..',
+      '...xxx...',
+      '....x....',
+      '.........'
+    ];
+  } else {
+    glyph = [
+      '...xxx...',
+      '.xx...xx.',
+      'xx..x..xx',
+      '.xx...xx.',
+      '...xxx...',
+      '.....xx..',
+      '......xx.',
+      '.........'
+    ];
+  }
+  drawPixelMatrix(ctx, x, y, 2, glyph, { x: color });
+}
+
 export function drawBullet(ctx: CanvasRenderingContext2D, b: Bullet): void {
   ctx.save();
-  ctx.translate(b.x, b.y);
-  ctx.rotate(b.angle);
+  ctx.translate(Math.round(b.x), Math.round(b.y));
 
   switch (b.shape) {
     case 'star': {
-      const rOuter = b.radius * 1.45;
-      const rInner = b.radius * 0.52;
-      ctx.fillStyle = b.color;
-      ctx.beginPath();
-      for (let i = 0; i < 12; i++) {
-        const rad = i % 2 === 0 ? rOuter : rInner;
-        const a = (i * Math.PI) / 6;
-        const bx = Math.cos(a) * rad;
-        const by = Math.sin(a) * rad;
-        if (i === 0) ctx.moveTo(bx, by);
-        else ctx.lineTo(bx, by);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = b.coreColor ?? '#000000';
-      ctx.beginPath();
-      ctx.arc(0, 0, b.radius * 0.36, 0, Math.PI * 2);
-      ctx.fill();
+      // Crisp pixel-art spiky Deltarune cluster star (matching yt_sd3.jpg!)
+      const isBg = b.customTag === 'bg_star';
+      if (isBg) ctx.globalAlpha = 0.34;
+      const starRows = [
+        '.....x.....',
+        '....xxx....',
+        '..xx.xxx.x.',
+        '.xxxxxxxxx.',
+        'xxxxxxxxxxx',
+        '.xxxxxxxxx.',
+        '..xxxxxxx..',
+        '...xxxxx...',
+        '....xxx....',
+        '.....x.....'
+      ];
+      const sc = b.radius >= 7.5 ? 2 : 1;
+      drawPixelMatrix(
+        ctx,
+        Math.round(-5.5 * sc),
+        Math.round(-5 * sc),
+        sc,
+        starRows,
+        { x: b.color }
+      );
       break;
     }
 
     case 'shard': {
+      ctx.rotate(b.angle);
       const r = b.radius * 1.3;
       ctx.fillStyle = b.color;
       ctx.beginPath();
@@ -748,6 +816,7 @@ export function drawBullet(ctx: CanvasRenderingContext2D, b: Bullet): void {
     }
 
     case 'diamond': {
+      ctx.rotate(b.angle);
       const rx = b.radius * 1.5;
       const ry = b.radius * 0.85;
       ctx.fillStyle = '#ffffff';
@@ -767,6 +836,7 @@ export function drawBullet(ctx: CanvasRenderingContext2D, b: Bullet): void {
 
     case 'sword':
     case 'dagger': {
+      ctx.rotate(b.angle);
       const len = b.length ?? (b.shape === 'sword' ? 36 : 22);
       const wid = b.width ?? (b.shape === 'sword' ? 7 : 5);
 

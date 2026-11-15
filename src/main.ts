@@ -93,12 +93,12 @@ const ALL_PRACTICE_PATTERNS: AttackPatternId[] = [
 ];
 
 const PARTY_SPRITE_POS: Array<{ x: number; y: number }> = [
-  { x: 124, y: 118 },
-  { x: 106, y: 188 },
-  { x: 120, y: 256 }
+  { x: 128, y: 126 },
+  { x: 110, y: 190 },
+  { x: 122, y: 256 }
 ];
 
-const KNIGHT_POS = { x: 520, y: 168 };
+const KNIGHT_POS = { x: 506, y: 184 };
 
 class RuneDeltaGame {
   private canvas: HTMLCanvasElement;
@@ -811,7 +811,7 @@ class RuneDeltaGame {
           this.resolveSteps.push({
             actorIndex: q.actorIndex,
             kind: 'RUDE_BUSTER',
-            text: `* Susie cast RUDE BUSTER! (Press [Z] right before impact!)`
+            text: `* Susie used RUDE BUSTER!`
           });
         } else if (q.subId === 'heal_prayer' || q.subId === 'ultimat_heal') {
           const tgt = this.party[q.targetIndex ?? 0];
@@ -955,14 +955,17 @@ class RuneDeltaGame {
   }
 
   private beginEnemyIntro(): void {
+    const isRoaring = this.currentAttackDef.id === 'roaring_final';
     this.subState = 'ENEMY_INTRO';
-    this.enemyIntroTimer = 0.35;
-    this.box.width = 48;
-    this.box.height = 48;
+    this.enemyIntroTimer = isRoaring ? 0.2 : 0.35;
+    this.box.cx = 320;
+    this.box.cy = isRoaring ? 236 : 186;
+    this.box.width = isRoaring ? this.currentAttackDef.boxWidth : 48;
+    this.box.height = isRoaring ? this.currentAttackDef.boxHeight : 48;
     this.box.targetWidth = this.currentAttackDef.boxWidth;
     this.box.targetHeight = this.currentAttackDef.boxHeight;
-    this.soul.x = this.box.cx;
-    this.soul.y = this.box.cy;
+    this.soul.x = isRoaring ? this.box.cx - 175 : this.box.cx;
+    this.soul.y = isRoaring ? this.box.cy + 95 : this.box.cy;
     this.soul.visible = true;
   }
 
@@ -1375,28 +1378,73 @@ class RuneDeltaGame {
       this.currentAttackDef.id === 'roaring_final' &&
       (this.subState === 'BULLET_HELL' || this.subState === 'ENEMY_INTRO');
 
-    drawBattleBackground(ctx, this.globalTime, isRoaring);
+    drawBattleBackground(ctx, this.globalTime, isRoaring, false);
 
-    // Draw Party Members (dimmed slightly during full-screen Roaring storm so bullets stay ultra-clear)
-    ctx.save();
-    if (isRoaring) ctx.globalAlpha = 0.35;
+    // During full-screen THE ROARING (yt_sd3.jpg), render borderless full-screen vortex,
+    // crimson-rimmed black rift slashes, centered Knight on top of the slash, stars & SOUL!
+    if (isRoaring) {
+      this.attackController.renderArenaAndHazards(
+        ctx,
+        this.box,
+        this.soul,
+        this.globalTime
+      );
+
+      // Knight floats right in the center of the vortex with sword raised aloft (yt_sd3.jpg!)
+      drawRoaringKnight(
+        ctx,
+        this.knight,
+        this.box.cx,
+        this.box.cy - 24,
+        this.globalTime
+      );
+
+      for (const b of this.attackController.bullets) {
+        if (b.color !== 'transparent') {
+          drawBullet(ctx, b);
+        }
+      }
+
+      if (this.soul.visible) {
+        const blinkHide =
+          this.soul.invulnTimer > 0 &&
+          Math.floor(this.soul.invulnTimer * 22) % 2 === 0;
+        if (!blinkHide) {
+          drawSoulHeart(
+            ctx,
+            this.soul.x,
+            this.soul.y,
+            0.9,
+            this.soul.holdBreathActive ? '#ff1e56' : '#ff0022',
+            this.soul.grazeFlashTimer / 0.16
+          );
+        }
+      }
+
+      drawTopHudBadge(
+        ctx,
+        this.knight,
+        Boolean(this.practicePatternId),
+        sound.isMuted()
+      );
+      drawPopups(ctx, this.popups);
+      return;
+    }
+
+    // Standard Battle Scene: Party Sprites on left + Hovering Knight with white wireframe echoes on right!
     this.party.forEach((m, idx) => {
       const p = PARTY_SPRITE_POS[idx];
       drawPartyMemberSprite(ctx, m, p.x, p.y, this.globalTime);
     });
-    ctx.restore();
 
-    // Draw The Roaring Knight (shifts to top-center during The Roaring Final Attack!)
-    const kx = isRoaring ? SCREEN_WIDTH / 2 : KNIGHT_POS.x;
-    const ky = isRoaring ? 74 : KNIGHT_POS.y;
-    drawRoaringKnight(ctx, this.knight, kx, ky, this.globalTime);
+    drawRoaringKnight(ctx, this.knight, KNIGHT_POS.x, KNIGHT_POS.y, this.globalTime);
 
     // Draw FIGHT weapon slash bursts across the Knight
     for (const sb of this.knightSlashBursts) {
       drawAttackSlashEffect(ctx, sb.x, sb.y, sb.progress, sb.color, sb.isCrit);
     }
 
-    // Draw Rude Buster Bolt if active
+    // Draw Rude Buster Shockwave if active
     drawRudeBusterBolt(ctx, this.rudeBolt);
 
     // Draw SWOON crimson screen-slash effect when Susie or Ralsei gets SWOONed!
@@ -1443,7 +1491,7 @@ class RuneDeltaGame {
       }
     }
 
-    // HUD: TP Bar, Top Turn/Phase Indicator, Party Strip & Bottom Dialogue/Menu Box
+    // HUD: Slanted Blade TP Bar, Top Practice/Mute Badge, Party Strip & Bottom Dialogue/Menu Area
     drawTpBar(ctx, this.tp);
     drawTopHudBadge(
       ctx,
@@ -1462,7 +1510,9 @@ class RuneDeltaGame {
       this.menu,
       this.dialogueText,
       this.dialogueCharsShown,
-      this.fightLanes
+      this.fightLanes,
+      this.queuedActions,
+      this.currentResolveStep?.actorIndex ?? -1
     );
 
     drawPopups(ctx, this.popups);
@@ -1505,10 +1555,16 @@ class RuneDeltaGame {
   }
 
   private renderTitleScreen(ctx: CanvasRenderingContext2D): void {
-    drawBattleBackground(ctx, this.globalTime, false);
+    drawBattleBackground(ctx, this.globalTime, false, true);
 
-    // Hovering Roaring Knight centerpiece
-    drawRoaringKnight(ctx, this.knight, SCREEN_WIDTH / 2 + 10, 180, this.globalTime);
+    // Party standing on the left icy snow ledges facing the Roaring Knight (matching yt_sd1.jpg!)
+    this.party.forEach((m, idx) => {
+      const p = PARTY_SPRITE_POS[idx];
+      drawPartyMemberSprite(ctx, m, p.x, p.y, this.globalTime);
+    });
+
+    // Hovering Roaring Knight on the right
+    drawRoaringKnight(ctx, this.knight, KNIGHT_POS.x, KNIGHT_POS.y, this.globalTime);
 
     // Title Logo
     ctx.save();

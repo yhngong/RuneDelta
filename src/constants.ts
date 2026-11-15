@@ -160,7 +160,7 @@ export function createParty(shadowMantleHolder: PartyId = 'susie'): PartyMember[
       id: 'kris',
       name: 'KRIS',
       color: '#00ffff',
-      hpBarColor: '#00ff00',
+      hpBarColor: '#00ffff',
       baseHp: 160,
       maxHp: 160,
       hp: 160,
@@ -180,7 +180,7 @@ export function createParty(shadowMantleHolder: PartyId = 'susie'): PartyMember[
       id: 'susie',
       name: 'SUSIE',
       color: '#ff00ff',
-      hpBarColor: '#00ff00',
+      hpBarColor: '#ff00ff',
       baseHp: 190,
       maxHp: 190,
       hp: 190,
@@ -306,14 +306,14 @@ export const ATTACK_DEFINITIONS: Record<AttackPatternId, AttackDefinition> = {
     id: 'sword_tunnel_2',
     name: 'Sword Tunnel II',
     phase: 2,
-    duration: 8.6,
+    duration: 8.8,
     targetMode: 'single',
     baseDamage: 102,
     invulnDuration: 0.35,
     element: 'dark_star',
-    flavorText: '* You feel cornered.',
+    flavorText: '* ...Your head is spinning.',
     boxWidth: 186,
-    boxHeight: 148
+    boxHeight: 156
   },
   box_splitter_2: {
     id: 'box_splitter_2',
@@ -404,9 +404,9 @@ export const ATTACK_DEFINITIONS: Record<AttackPatternId, AttackDefinition> = {
     baseDamage: 112,
     invulnDuration: 0.3,
     element: 'dark_star',
-    flavorText: '* Nowhere left to run.',
-    boxWidth: 184,
-    boxHeight: 156
+    flavorText: '* You feel cornered.',
+    boxWidth: 192,
+    boxHeight: 144
   },
   rotating_slash_2: {
     id: 'rotating_slash_2',
@@ -453,14 +453,14 @@ export const ATTACK_DEFINITIONS: Record<AttackPatternId, AttackDefinition> = {
     id: 'roaring_final',
     name: 'THE ROARING (Final Attack)',
     phase: 4,
-    duration: 13.8,
+    duration: 14.2,
     targetMode: 'all',
     baseDamage: 40, // Fixed 40 bullet dmg + 75 final slash!
     invulnDuration: 0.65,
     element: 'roaring',
-    flavorText: '* Blinding white darkness fills the arena... Survive!!',
-    boxWidth: 250,
-    boxHeight: 174
+    flavorText: '* The Roaring Knight begins to inhale the stars...',
+    boxWidth: 590,
+    boxHeight: 430
   }
 };
 

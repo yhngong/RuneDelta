@@ -6,7 +6,12 @@ import {
   hasShadowMantle
 } from './combat';
 import { ATTACK_DEFINITIONS, SCREEN_HEIGHT, SCREEN_WIDTH } from './constants';
-import { drawCommandIcon, drawMemberPortrait, drawSoulHeart } from './sprites';
+import {
+  drawCommandIcon,
+  drawMemberPortrait,
+  drawMiniActionGlyph,
+  drawSoulHeart
+} from './sprites';
 import {
   AttackPatternId,
   FightLane,
@@ -15,6 +20,7 @@ import {
   KnightState,
   PartyId,
   PartyMember,
+  QueuedAction,
   RudeBusterBolt
 } from './types';
 
@@ -38,193 +44,303 @@ export interface MenuUiState {
 }
 
 // ============================================================================
-// CHAPTER 3 "COLD PLACE" SNOWY GROUND & DARK FOUNTAIN BACKGROUND
+// CHAPTER 3 ROARING KNIGHT STAGE ARCH, PURPLE MIST ARENA & ROARING VORTEX
+// (Directly matching reference video https://www.youtube.com/watch?v=KOu-Zaw-uhc)
 // ============================================================================
 export function drawBattleBackground(
   ctx: CanvasRenderingContext2D,
   time: number,
-  isRoaringPhase: boolean
+  isRoaringPhase: boolean,
+  isTitleScene = false
 ): void {
-  // Pitch-black void sky
+  // Pitch-black void base
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+  // Full-screen concentric jagged purple vortex during THE ROARING (yt_sd3.jpg)
+  if (isRoaringPhase) {
+    const vcx = SCREEN_WIDTH * 0.5;
+    const vcy = 212;
+
+    ctx.fillStyle = '#14021d';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    // Outer swirling dark-magenta mist bands
+    for (let y = 0; y < SCREEN_HEIGHT; y += 6) {
+      const wave = Math.sin(y * 0.045 + time * 3.2) * 28 + Math.cos(y * 0.09 - time * 2.1) * 14;
+      ctx.fillStyle = y % 12 === 0 ? '#2b063d' : '#1f042c';
+      ctx.fillRect(Math.round(wave), y, SCREEN_WIDTH - Math.abs(Math.round(wave)), 5);
+    }
+
+    // Concentric jagged vortex rings pulsing inward toward the Knight
+    const ringColors = ['#3c0954', '#580e7a', '#35074a', '#1d0329', '#0c0112'];
+    const baseRadii = [340, 265, 200, 145, 96];
+    const pulse = ((time * 1.4) % 1) * 24;
+
+    for (let rIdx = 0; rIdx < ringColors.length; rIdx++) {
+      const rad = Math.max(48, baseRadii[rIdx] - (rIdx < 4 ? pulse * 0.7 : 0));
+      ctx.fillStyle = ringColors[rIdx];
+      ctx.beginPath();
+      const steps = 48;
+      for (let s = 0; s <= steps; s++) {
+        const ang = (s / steps) * Math.PI * 2;
+        const jag =
+          Math.sin(ang * 11 + time * 4.5 + rIdx) * 12 +
+          Math.cos(ang * 7 - time * 3.1) * 9;
+        const rx = (rad + jag) * 1.12;
+        const ry = (rad + jag) * 0.94;
+        const px = vcx + Math.cos(ang) * rx;
+        const py = vcy + Math.sin(ang) * ry;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Subtle swirling violet wisps inside the mid vortex ring
+    ctx.fillStyle = 'rgba(148, 36, 204, 0.22)';
+    for (let i = 0; i < 14; i++) {
+      const wy = Math.round(((i * 34 + time * 42) % 360) + 40);
+      const wx = Math.round(vcx + Math.sin(wy * 0.05 + time * 2 + i) * 140 - 45);
+      ctx.fillRect(wx, wy, 90, 4);
+    }
+    return;
+  }
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, SCREEN_WIDTH, 326);
   ctx.clip();
 
-  // 1. Distant Towering Dark Fountain Pillar in the sky (y: 0..242)
-  const fountainCx = isRoaringPhase ? 320 : 350;
-  const baseHalfW = isRoaringPhase ? 120 : 68;
-  for (let y = 0; y < 242; y += 4) {
-    const wave1 = Math.sin(y * 0.045 - time * 2.8) * 10;
-    const wave2 = Math.cos(y * 0.08 + time * 1.9) * 5;
-    const spread = (1 - y / 242) * 20;
-    const hw = baseHalfW + spread;
+  // 1. Top-Center Curved Stage Curtain Arch & Jagged Fringe Teeth (y: 0..88)
+  // Warm golden-ochre in active battle (yt_sd2.jpg), moody blue-slate on intro/title (yt_sd1.jpg)
+  const archOuterGlow = isTitleScene ? '#161826' : '#2a1d08';
+  const archMidShade = isTitleScene ? '#22253a' : '#5e4215';
+  const archMainColor = isTitleScene ? '#323652' : '#9c7129';
+  const teethBackColor = isTitleScene ? '#1e2134' : '#573d14';
+  const teethFrontColor = isTitleScene ? '#2f334d' : '#8f6724';
 
-    // Outer dark aura band
-    ctx.fillStyle = isRoaringPhase ? '#2b2b36' : '#0a1428';
-    ctx.fillRect(
-      Math.round(fountainCx + wave1 - hw * 1.35),
-      y,
-      Math.round(hw * 2.7),
-      4
-    );
-
-    // Mid fountain band
-    ctx.fillStyle = isRoaringPhase ? '#6e6e82' : '#13264a';
-    ctx.fillRect(
-      Math.round(fountainCx + wave1 * 0.7 + wave2 - hw * 0.82),
-      y,
-      Math.round(hw * 1.64),
-      4
-    );
-
-    // Inner bright geyser core
-    ctx.fillStyle = isRoaringPhase ? '#e4e4f0' : '#1f3d73';
-    ctx.fillRect(
-      Math.round(fountainCx - wave2 - hw * 0.34),
-      y,
-      Math.round(hw * 0.68),
-      4
-    );
+  // Soft outer arch aura
+  ctx.fillStyle = archOuterGlow;
+  for (let y = 0; y < 88; y += 2) {
+    const curve = Math.pow(y / 88, 1.55) * 26;
+    ctx.fillRect(Math.round(156 + curve), y, Math.round(328 - curve * 2), 2);
   }
 
-  // Subtle eerie TV-static horizontal scanline glints in the dark sky
-  ctx.fillStyle = isRoaringPhase
-    ? 'rgba(255, 255, 255, 0.09)'
-    : 'rgba(130, 170, 235, 0.05)';
-  for (let i = 0; i < 9; i++) {
-    const sy = Math.floor(((time * 38 + i * 29) % 230) / 2) * 2;
-    ctx.fillRect(0, sy, SCREEN_WIDTH, 2);
+  // Dark inner recess behind the hanging fringe teeth
+  ctx.fillStyle = isTitleScene ? '#0b0c14' : '#1b1205';
+  for (let y = 0; y < 88; y += 2) {
+    const curve = Math.pow(y / 88, 1.55) * 26;
+    ctx.fillRect(Math.round(196 + curve), y, Math.round(248 - curve * 2), 2);
   }
 
-  // 2. Distant Cold Place dark pine/cliff horizon silhouettes (y: 206..242)
-  ctx.fillStyle = '#070d1c';
-  const treePositions = [22, 58, 95, 148, 210, 468, 522, 566, 608];
-  for (const tx of treePositions) {
+  // Jagged hanging curtain fringe / stalactite teeth across top center (x: 206..434)
+  const teethHeights = [
+    36, 40, 42, 41, 38, 44, 24, 48, 46, 22, 39, 32, 46, 52, 44, 30, 54, 48, 38, 45, 34, 26, 18
+  ];
+  const toothStartX = 212;
+  const toothW = 9.5;
+  teethHeights.forEach((th, idx) => {
+    const tx = Math.round(toothStartX + idx * toothW);
+    const sway = Math.sin(time * 1.6 + idx * 0.7) * 1.2;
+    ctx.fillStyle = teethBackColor;
+    ctx.fillRect(tx - 1, 6, Math.ceil(toothW), Math.round(th + 6 + sway));
+    if (idx % 3 !== 1) {
+      ctx.fillStyle = teethFrontColor;
+      ctx.beginPath();
+      ctx.moveTo(tx, 10);
+      ctx.lineTo(tx + toothW - 1, 10);
+      ctx.lineTo(tx + toothW * 0.5, 10 + th + sway);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+
+  // Left & Right Curved Stage Arch Pillars
+  for (let y = 0; y < 88; y += 2) {
+    const curve = Math.pow(y / 88, 1.55) * 26;
+    // Inner bevel
+    ctx.fillStyle = archMidShade;
+    ctx.fillRect(Math.round(170 + curve), y, 36, 2);
+    ctx.fillRect(Math.round(434 - curve), y, 36, 2);
+    // Main bright pillar band
+    ctx.fillStyle = archMainColor;
+    ctx.fillRect(Math.round(174 + curve), y, 26, 2);
+    ctx.fillRect(Math.round(440 - curve), y, 26, 2);
+  }
+
+  // 2. Main Battleground (y: 88..324)
+  if (!isTitleScene) {
+    // Deep Dark Purple-Magenta Undulating Mist Clouds (yt_sd2.jpg!)
+    ctx.fillStyle = '#0d0114';
+    ctx.fillRect(0, 88, SCREEN_WIDTH, 238);
+
+    const cloudBands = [
+      { yBase: 94, h: 228, col: '#1a0326', amp: 14, spd: 0.9, freq: 0.022 },
+      { yBase: 122, h: 200, col: '#2b063e', amp: 16, spd: -1.2, freq: 0.028 },
+      { yBase: 166, h: 156, col: '#3e0a57', amp: 12, spd: 1.45, freq: 0.034 },
+      { yBase: 224, h: 98, col: '#520e70', amp: 10, spd: -1.7, freq: 0.04 }
+    ];
+
+    for (const band of cloudBands) {
+      ctx.fillStyle = band.col;
+      for (let x = 0; x < SCREEN_WIDTH; x += 8) {
+        const yOff =
+          Math.sin(x * band.freq + time * band.spd) * band.amp +
+          Math.cos(x * band.freq * 1.7 - time * band.spd * 0.6) * (band.amp * 0.5);
+        const topY = Math.max(88, Math.round(band.yBase + yOff));
+        ctx.fillRect(x, topY, 8, Math.max(0, 324 - topY));
+      }
+    }
+
+    // Horizontal dark-purple smoke wisps across the lower/mid arena (matching yt_sd2.jpg)
+    for (let i = 0; i < 22; i++) {
+      const wx = Math.round(((i * 79 - time * (18 + (i % 3) * 7)) % (SCREEN_WIDTH + 120)) - 60);
+      const wrappedWx = wx < -60 ? wx + SCREEN_WIDTH + 120 : wx;
+      const wy = 104 + ((i * 31) % 208);
+      const ww = 48 + (i % 4) * 22;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(118, 22, 158, 0.28)' : 'rgba(20, 2, 30, 0.45)';
+      ctx.fillRect(wrappedWx, wy, ww, 6);
+      ctx.fillRect(wrappedWx + 10, wy - 3, ww - 20, 3);
+    }
+
+    // Top edge dark vignette blending the purple mist cleanly below y = 88
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    ctx.fillRect(0, 88, SCREEN_WIDTH, 8);
+  }
+
+  // 3. Stepped Jagged Pale Ice-Blue Snow Ledges on the Left beneath Kris, Susie & Ralsei (yt_sd1.jpg)
+  const ledges = isTitleScene
+    ? [
+        { x: 0, y: 146, w: 128, h: 14 },
+        { x: 0, y: 174, w: 96, h: 18 },
+        { x: 0, y: 214, w: 72, h: 14 },
+        { x: 148, y: 214, w: 52, h: 10 },
+        { x: 0, y: 252, w: 152, h: 34 },
+        { x: 138, y: 294, w: 68, h: 12 },
+        { x: 0, y: 298, w: 186, h: 28 }
+      ]
+    : [
+        { x: 58, y: 142, w: 68, h: 8 },
+        { x: 48, y: 204, w: 72, h: 9 },
+        { x: 56, y: 268, w: 78, h: 10 }
+      ];
+
+  for (const l of ledges) {
+    ctx.save();
+    if (!isTitleScene) ctx.globalAlpha = 0.26;
+    // Underside icy shadow
+    ctx.fillStyle = '#7e96b8';
     ctx.beginPath();
-    ctx.moveTo(tx, 204);
-    ctx.lineTo(tx - 20, 242);
-    ctx.lineTo(tx + 20, 242);
+    ctx.moveTo(l.x, l.y + 4);
+    ctx.lineTo(l.x + l.w - 14, l.y + 4);
+    ctx.lineTo(l.x + l.w + 4, l.y + l.h * 0.65);
+    ctx.lineTo(l.x + l.w - 22, l.y + l.h + 4);
+    ctx.lineTo(l.x, l.y + l.h + 4);
     ctx.closePath();
     ctx.fill();
-  }
 
-  // 3. Snowy Cold Place Ground (y: 238..326) — Pale icy blue & pixel snowbanks!
-  if (isRoaringPhase) {
-    // Stark high-contrast monochrome snowground during The Roaring!
-    ctx.fillStyle = '#181820';
-    ctx.fillRect(0, 238, SCREEN_WIDTH, 88);
-    ctx.fillStyle = '#323242';
-    ctx.fillRect(0, 238, SCREEN_WIDTH, 10);
-    ctx.fillStyle = '#bcbcd0';
-    ctx.fillRect(0, 238, SCREEN_WIDTH, 3);
-  } else {
-    // Deep blue-slate snow base
-    ctx.fillStyle = '#1b2847';
-    ctx.fillRect(0, 238, SCREEN_WIDTH, 88);
-
-    // Mid pale-blue snowfield
-    ctx.fillStyle = '#334978';
-    ctx.fillRect(0, 240, SCREEN_WIDTH, 66);
-
-    ctx.fillStyle = '#5874ab';
-    ctx.fillRect(0, 242, SCREEN_WIDTH, 42);
-
-    // Bright crisp snowdrift top crust with pixel undulations
-    ctx.fillStyle = '#9bb3de';
-    for (let x = 0; x < SCREEN_WIDTH; x += 8) {
-      const h = 14 + Math.round(Math.sin(x * 0.035) * 4);
-      ctx.fillRect(x, 238, 8, h);
-    }
-    ctx.fillStyle = '#d4e2fa';
-    for (let x = 0; x < SCREEN_WIDTH; x += 8) {
-      const yOff = Math.round(Math.sin(x * 0.05 + 1) * 2);
-      ctx.fillRect(x, 236 + yOff, 8, 5);
-    }
-
-    // Scattered pixel snow speckles on the ground
-    ctx.fillStyle = '#9bb3de';
-    for (let i = 0; i < 28; i++) {
-      const sx = ((i * 73) % 620) + 10;
-      const sy = 258 + ((i * 37) % 56);
-      ctx.fillRect(sx, sy, 4, 2);
-    }
-  }
-
-  // 4. Gently drifting pixelated snow / static particles
-  ctx.fillStyle = isRoaringPhase ? '#ffffff' : '#dce8ff';
-  for (let i = 0; i < 34; i++) {
-    const px = Math.round((i * 97 - time * (16 + (i % 4) * 5)) % SCREEN_WIDTH);
-    const wrappedX = px < 0 ? px + SCREEN_WIDTH : px;
-    const py = Math.round((i * 53 + time * (22 + (i % 3) * 8)) % 320);
-    const sz = i % 3 === 0 ? 3 : 2;
-    ctx.fillRect(wrappedX, py, sz, sz);
+    // Crisp pale snow crust
+    ctx.fillStyle = '#bacde8';
+    ctx.beginPath();
+    ctx.moveTo(l.x, l.y + 2);
+    ctx.lineTo(l.x + l.w * 0.55, l.y);
+    ctx.lineTo(l.x + l.w, l.y + l.h * 0.45);
+    ctx.lineTo(l.x + l.w - 16, l.y + l.h);
+    ctx.lineTo(l.x, l.y + l.h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   ctx.restore();
 }
 
 // ============================================================================
-// AUTHENTIC DELTARUNE LEFT-SIDE TP BAR
+// AUTHENTIC DELTARUNE SLANTED BLADE TP BAR (Matching yt_sd2.jpg!)
 // ============================================================================
 export function drawTpBar(ctx: CanvasRenderingContext2D, tp: number): void {
-  const barX = 38;
-  const barY = 42;
-  const barW = 21;
-  const barH = 178;
+  const barX = 40;
+  const barY = 44;
+  const barW = 20;
+  const barH = 192;
+  const slant = 20;
 
-  // Stacked "T" "P" text on the left of the gauge (just like real Deltarune!)
-  ctx.font = 'bold 14px "Press Start 2P", monospace';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('T', 12, barY + 26);
-  ctx.fillText('P', 12, barY + 44);
-
+  // Left-side stacked "T" "P" "0" "%" text matching yt_sd2.jpg!
   const pct = Math.max(0, Math.min(100, Math.floor(tp)));
+  ctx.save();
+  ctx.font = 'bold 13px "Press Start 2P", monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('T', 15, barY + 38);
+  ctx.fillText('P', 15, barY + 56);
+
   if (pct >= 100) {
     ctx.font = 'bold 11px "Press Start 2P", monospace';
     ctx.fillStyle = '#ffff00';
-    ctx.fillText('M', 12, barY + 76);
-    ctx.fillText('A', 12, barY + 91);
-    ctx.fillText('X', 12, barY + 106);
+    ctx.fillText('M', 15, barY + 84);
+    ctx.fillText('A', 15, barY + 99);
+    ctx.fillText('X', 15, barY + 114);
   } else {
-    ctx.font = 'bold 12px "Press Start 2P", monospace';
+    ctx.font = 'bold 13px "Press Start 2P", monospace';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    ctx.fillText(`${pct}`, 21, barY + 78);
-    ctx.fillText('%', 21, barY + 96);
+    ctx.fillText(`${pct}`, 22, barY + 86);
+    ctx.fillText('%', 22, barY + 108);
     ctx.textAlign = 'left';
   }
 
-  // Black shadow + White outer border + Dark maroon empty track
+  // Helper path for the 45°-slanted blade silhouette
+  const traceBladePath = () => {
+    ctx.beginPath();
+    ctx.moveTo(barX, barY + slant);
+    ctx.lineTo(barX + barW, barY);
+    ctx.lineTo(barX + barW, barY + barH - slant);
+    ctx.lineTo(barX, barY + barH);
+    ctx.closePath();
+  };
+
+  // Subtle dark backing + deep crimson #680008 track
   ctx.fillStyle = '#000000';
-  ctx.fillRect(barX - 2, barY - 2, barW + 4, barH + 4);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(barX, barY, barW, barH);
+  ctx.save();
+  ctx.translate(-2, -2);
+  traceBladePath();
+  ctx.fill();
+  ctx.restore();
 
-  ctx.fillStyle = '#540d1e';
-  ctx.fillRect(barX + 2, barY + 2, barW - 4, barH - 4);
+  traceBladePath();
+  ctx.fillStyle = '#680008';
+  ctx.fill();
 
-  // Bright Deltarune Orange (#ffa040) or MAX Yellow (#ffff00) fill
-  const innerH = barH - 4;
-  const fillH = Math.round((innerH * pct) / 100);
-  if (fillH > 0) {
+  // Clip orange (#ffa040) / MAX yellow (#ffff00) fill inside the slanted blade!
+  if (pct > 0) {
+    ctx.save();
+    traceBladePath();
+    ctx.clip();
+
+    const fillTopY = Math.round(barY + barH - (barH * pct) / 100);
     ctx.fillStyle = pct >= 100 ? '#ffff00' : '#ffa040';
-    ctx.fillRect(barX + 2, barY + 2 + (innerH - fillH), barW - 4, fillH);
-    // Crisp white liquid surface highlight
+    ctx.fillRect(barX - 2, fillTopY, barW + 4, barH + 4);
+
     if (pct < 100) {
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(barX + 2, barY + 2 + (innerH - fillH), barW - 4, 3);
+      ctx.fillRect(barX - 2, fillTopY, barW + 4, 3);
     }
+    ctx.restore();
   }
+
+  // Subtle dark-red or golden rim
+  traceBladePath();
+  ctx.strokeStyle = pct >= 100 ? '#ffff88' : '#3a0006';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 export function drawTopHudBadge(
   ctx: CanvasRenderingContext2D,
-  knight: KnightState,
+  _knight: KnightState,
   isPractice: boolean,
   muted: boolean
 ): void {
@@ -241,7 +357,7 @@ export function drawTopHudBadge(
 }
 
 // ============================================================================
-// AUTHENTIC DELTARUNE 3-CARD PARTY STRIP + DARK WORLD DIALOGUE BOX
+// AUTHENTIC DELTARUNE PARTY STRIP + BORDERLESS DIALOGUE / MENU AREA (yt_sd2.jpg)
 // ============================================================================
 export function drawPartyStripAndBottomBox(
   ctx: CanvasRenderingContext2D,
@@ -254,45 +370,54 @@ export function drawPartyStripAndBottomBox(
   menu: MenuUiState,
   dialogueText: string,
   dialogueCharsShown: number,
-  fightLanes: FightLane[]
+  fightLanes: FightLane[],
+  queuedActions: QueuedAction[] = [],
+  activeResolveActorIndex = -1
 ): void {
   // Solid black HUD base (y: 326..480)
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 326, SCREEN_WIDTH, SCREEN_HEIGHT - 326);
 
-  // Decorative Deltarune Dark World purple-blue divider lines at y = 326 & y = 363
-  ctx.fillStyle = '#332066';
-  ctx.fillRect(0, 326, SCREEN_WIDTH, 3);
-  ctx.fillRect(0, 362, SCREEN_WIDTH, 3);
+  // Sleek horizontal Dark World purple divider lines at y = 326 & y = 362 (yt_sd2.jpg!)
+  ctx.fillStyle = '#3b1c5e';
+  ctx.fillRect(0, 326, SCREEN_WIDTH, 2);
+  ctx.fillRect(0, 362, SCREEN_WIDTH, 2);
 
-  const cardW = 212;
-  const startX = 2;
+  const cardW = 204;
+  const startX = 14;
 
-  // 1. Render the 3 Party Member HUD Cards (KRIS, SUSIE, RALSEI)
+  // 1. Render the 3 Party Member HUD Slots (KRIS, SUSIE, RALSEI)
   party.forEach((m, idx) => {
     const isActiveMenu = subState === 'PARTY_MENU' && menu.activeActorIndex === idx;
-    const cx = startX + idx * (cardW + 1);
+    const cx = startX + idx * cardW;
     const cy = isActiveMenu ? 294 : 328;
     const cardH = isActiveMenu ? 69 : 34;
 
-    // Card background & border
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(cx, cy, cardW, cardH);
-
     if (isActiveMenu) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(cx, cy, cardW, cardH);
       ctx.strokeStyle = m.color;
       ctx.lineWidth = 2;
       ctx.strokeRect(cx + 1, cy + 1, cardW - 2, cardH - 2);
-      // Inner divider separating Portrait/HP from the 5 Action Icons
       ctx.fillStyle = m.color;
       ctx.fillRect(cx + 1, cy + 34, cardW - 2, 2);
-    } else if (idx > 0) {
-      ctx.fillStyle = '#221544';
-      ctx.fillRect(cx, 329, 2, 33);
     }
 
-    // Pixel-art Character Headshot Portrait on left!
-    drawMemberPortrait(ctx, m, cx + 6, cy + 5);
+    // Show colored mini action glyph when this member has a queued command waiting (yt_sd2.jpg!),
+    // or their pixel-art portrait otherwise!
+    const queued = queuedActions.find((q) => q.actorIndex === idx);
+    const showActionGlyph =
+      !isActiveMenu &&
+      queued !== undefined &&
+      m.status === 'UP' &&
+      (subState === 'PARTY_MENU' ||
+        (subState === 'RESOLVE_ACTIONS' && activeResolveActorIndex !== idx));
+
+    if (showActionGlyph && queued) {
+      drawMiniActionGlyph(ctx, queued.type, cx + 6, cy + 8, m.hpBarColor);
+    } else {
+      drawMemberPortrait(ctx, m, cx + 4, cy + 4);
+    }
 
     // Character Name
     ctx.font = 'bold 11px "Press Start 2P", monospace';
@@ -304,46 +429,45 @@ export function drawPartyStripAndBottomBox(
           : isActiveMenu
             ? m.color
             : '#ffffff';
-    ctx.fillText(m.name, cx + 38, cy + 17);
+    ctx.fillText(m.name, cx + 32, cy + 21);
 
-    // Subtle ShadowMantle mini-star indicator next to name
-    if (hasShadowMantle(m)) {
-      ctx.fillStyle = '#b983ff';
-      ctx.fillRect(cx + 38, cy + 22, 6, 6);
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(cx + 40, cy + 24, 2, 2);
+    // Subtle ShadowMantle mini-emblem next to name during menu selection
+    if (hasShadowMantle(m) && isActiveMenu) {
+      ctx.fillStyle = '#c084fc';
+      ctx.fillRect(cx + 32, cy + 24, 6, 5);
     }
 
-    // HP Label, Numbers & Canonical #00FF00 Green Bar over #800000 Maroon!
-    const hpAreaX = cx + 112;
-    ctx.font = 'bold 8px "Press Start 2P", monospace';
+    // HP Label, Numbers & Character-Specific Colored HP Bar (#00ffff, #ff00ff, #00ff00)!
+    const hpLabelX = cx + 102;
+    const barX = cx + 122;
+    const barW = 74;
+    const barY = cy + 19;
+    const barH = 9;
+
+    ctx.font = 'bold 7px "Press Start 2P", monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('HP', hpAreaX, cy + 13);
+    ctx.fillText('HP', hpLabelX, cy + 27);
 
     ctx.textAlign = 'right';
-    ctx.font = '16px "VT323", monospace';
+    ctx.font = 'bold 8px "Press Start 2P", monospace';
     if (m.status === 'SWOON') {
       ctx.fillStyle = '#ff1744';
-      ctx.fillText('SWOON -999', cx + cardW - 6, cy + 14);
+      ctx.fillText('-999', barX + barW, cy + 14);
     } else if (m.status === 'DOWN') {
       ctx.fillStyle = '#ff4444';
-      ctx.fillText(`${m.hp}/${m.maxHp}`, cx + cardW - 6, cy + 14);
+      ctx.fillText(`${m.hp}/${m.maxHp}`, barX + barW, cy + 14);
     } else {
       ctx.fillStyle = m.hp <= m.maxHp * 0.25 ? '#ffff00' : '#ffffff';
-      ctx.fillText(`${m.hp}/${m.maxHp}`, cx + cardW - 6, cy + 14);
+      ctx.fillText(`${m.hp}/${m.maxHp}`, barX + barW, cy + 14);
     }
     ctx.textAlign = 'left';
 
-    // HP Gauge (Deltarune exact #800000 empty + #00ff00 fill!)
-    const barX = hpAreaX;
-    const barY = cy + 19;
-    const barW = cardW - 118;
-    const barH = 9;
-    ctx.fillStyle = '#800000';
+    // Character-Colored HP Gauge over #550000 Dark Maroon (exact match to yt_sd2.jpg!)
+    ctx.fillStyle = '#550000';
     ctx.fillRect(barX, barY, barW, barH);
     if (m.hp > 0) {
       const ratio = Math.max(0, Math.min(1, m.hp / m.maxHp));
-      ctx.fillStyle = '#00ff00';
+      ctx.fillStyle = m.hpBarColor;
       ctx.fillRect(barX, barY, Math.round(barW * ratio), barH);
     }
 
@@ -355,7 +479,7 @@ export function drawPartyStripAndBottomBox(
           : ['FIGHT', 'MAGIC', 'ITEM', 'SPARE', 'DEFEND'];
 
       icons.forEach((iconKind, bIdx) => {
-        const ix = cx + 12 + bIdx * 39;
+        const ix = cx + 8 + bIdx * 38;
         const iy = cy + 40;
         const selected = menu.subMode === 'ROOT' && menu.rootButtonIndex === bIdx;
         drawCommandIcon(ctx, iconKind, ix, iy, selected);
@@ -363,24 +487,21 @@ export function drawPartyStripAndBottomBox(
     }
   });
 
-  // 2. Bottom Dark World Frame Box (y: 365..476)
+  // 2. Bottom Area below y = 364
   const boxX = 6;
   const boxY = 366;
   const boxW = SCREEN_WIDTH - 12;
   const boxH = 108;
 
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(boxX, boxY, boxW, boxH);
-
-  // Outer Deltarune Dark World indigo-violet frame + inner crisp accent
-  ctx.strokeStyle = '#332066';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(boxX, boxY, boxW, boxH);
-  ctx.strokeStyle = '#1b1038';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(boxX + 4, boxY + 4, boxW - 8, boxH - 8);
+  // During BULLET_HELL or ENEMY_INTRO, keep bottom area clean pitch-black (matching Deltarune!)
+  if (subState === 'BULLET_HELL' || subState === 'ENEMY_INTRO') {
+    return;
+  }
 
   if (subState === 'FIGHT_BARS') {
+    ctx.strokeStyle = '#3b1c5e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
     drawFightReticles(ctx, boxX, boxY, boxW, boxH, party, fightLanes);
     return;
   }
@@ -402,13 +523,13 @@ export function drawPartyStripAndBottomBox(
     return;
   }
 
-  // Typewriter flavor / battle dialogue text
+  // Borderless black dialogue area for "* Susie used RUDE BUSTER!" & turn flavor text (yt_sd2.jpg!)
   const shown = dialogueText.slice(0, dialogueCharsShown);
-  const lines = wrapText(shown, 54);
+  const lines = wrapText(shown, 52);
   ctx.fillStyle = '#ffffff';
-  ctx.font = '24px "VT323", monospace';
+  ctx.font = 'bold 14px "Press Start 2P", monospace';
   lines.slice(0, 3).forEach((ln, idx) => {
-    ctx.fillText(ln, boxX + 22, boxY + 34 + idx * 28);
+    ctx.fillText(ln, 34, boxY + 34 + idx * 28);
   });
 }
 
@@ -721,29 +842,80 @@ function drawFightReticles(
 export function drawRudeBusterBolt(ctx: CanvasRenderingContext2D, bolt: RudeBusterBolt): void {
   if (!bolt.active) return;
 
-  for (const pt of bolt.trail) {
+  // Helper to draw a sweeping jagged crescent shockwave matching yt_sd2.jpg!
+  const drawCrescentWave = (
+    cx: number,
+    cy: number,
+    scale: number,
+    fillColor: string,
+    alpha: number,
+    tilt: number
+  ) => {
     ctx.save();
-    ctx.globalAlpha = pt.alpha * 0.65;
-    ctx.strokeStyle = bolt.boosted ? '#ffff00' : '#ff00dd';
-    ctx.lineWidth = 5;
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.translate(cx, cy);
+    ctx.rotate(tilt);
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = fillColor;
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 18, -0.9, 0.9);
-    ctx.stroke();
+    // Outer sweeping arc (top-left tail to bottom-left tip)
+    ctx.moveTo(-48, -42);
+    ctx.quadraticCurveTo(8, -54, 46, -6);
+    ctx.quadraticCurveTo(18, 42, -32, 48);
+    // Jagged inner trailing edge
+    ctx.lineTo(-12, 32);
+    ctx.lineTo(-24, 24);
+    ctx.lineTo(-2, 14);
+    ctx.lineTo(-16, 4);
+    ctx.lineTo(10, -6);
+    ctx.lineTo(-8, -18);
+    ctx.lineTo(4, -26);
+    ctx.lineTo(-26, -32);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
-  }
+  };
 
+  // 1. Multi-layered trailing purple/violet crescent wakes (yt_sd2.jpg!)
+  const wakeColors = ['#3b0778', '#6814c7', '#9f2bff'];
+  bolt.trail.slice(-6).forEach((pt, idx, arr) => {
+    const frac = (idx + 1) / arr.length;
+    const col = bolt.boosted && idx === arr.length - 1
+      ? '#ffe659'
+      : wakeColors[Math.min(wakeColors.length - 1, Math.floor(frac * wakeColors.length))];
+    drawCrescentWave(
+      pt.x - (1 - frac) * 18,
+      pt.y + (1 - frac) * 8,
+      0.72 + frac * 0.36,
+      col,
+      pt.alpha * 0.85,
+      0.12 - frac * 0.08
+    );
+  });
+
+  // 2. Immediate violet body behind the leading edge
+  drawCrescentWave(bolt.x - 10, bolt.y + 8, 1.08, '#9f2bff', 0.95, 0.08);
+
+  // 3. Iconic blazing Mint-Cyan (#58ffd0) top/leading crescent blade (yt_sd2.jpg!)
   ctx.save();
-  ctx.translate(bolt.x, bolt.y);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 6;
+  ctx.translate(bolt.x, bolt.y - 12);
+  ctx.rotate(-0.18);
+  ctx.fillStyle = bolt.boosted ? '#ffff99' : '#58ffd0';
   ctx.beginPath();
-  ctx.arc(0, 0, 22, -1.05, 1.05);
-  ctx.stroke();
+  ctx.moveTo(-56, -24);
+  ctx.quadraticCurveTo(-4, -44, 48, -4);
+  ctx.lineTo(34, 12);
+  ctx.quadraticCurveTo(-10, -16, -48, -8);
+  ctx.closePath();
+  ctx.fill();
 
-  ctx.strokeStyle = bolt.boosted ? '#ffff00' : '#ff00dd';
-  ctx.lineWidth = 3;
+  // Crisp inner highlight along the mint crest
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(4, 0, 25, -1.1, 1.1);
+  ctx.moveTo(-44, -20);
+  ctx.quadraticCurveTo(-2, -36, 42, -4);
   ctx.stroke();
   ctx.restore();
 }
