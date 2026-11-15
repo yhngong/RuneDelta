@@ -98,7 +98,7 @@ const PARTY_SPRITE_POS: Array<{ x: number; y: number }> = [
   { x: 120, y: 256 }
 ];
 
-const KNIGHT_POS = { x: 502, y: 162 };
+const KNIGHT_POS = { x: 520, y: 168 };
 
 class RuneDeltaGame {
   private canvas: HTMLCanvasElement;
@@ -1508,7 +1508,7 @@ class RuneDeltaGame {
     drawBattleBackground(ctx, this.globalTime, false);
 
     // Hovering Roaring Knight centerpiece
-    drawRoaringKnight(ctx, this.knight, SCREEN_WIDTH / 2, 168, this.globalTime);
+    drawRoaringKnight(ctx, this.knight, SCREEN_WIDTH / 2 + 10, 180, this.globalTime);
 
     // Title Logo
     ctx.save();

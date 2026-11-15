@@ -1,4 +1,5 @@
 import { hasShadowMantle } from './combat';
+import { KNIGHT_SPRITE_FRAMES } from './knightSpriteData';
 import { Bullet, KnightState, PartyMember } from './types';
 
 function px(
@@ -509,8 +510,51 @@ export function drawPartyMemberSprite(
 }
 
 // ============================================================================
-// THE ROARING KNIGHT — TRUE CHAPTER 3 SILHOUETTE & SPRITE ANATOMY!
+// THE ROARING KNIGHT — EXACT 68x65 PIXEL SPRITE (FROM Roaring_Knight_Idle.webp)
 // ============================================================================
+const knightBitmapCache = new Map<string, HTMLCanvasElement>();
+
+function getKnightBitmap(
+  frameKey: string,
+  variant: 'normal' | 'ghost' | 'hurt'
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const cacheKey = `${frameKey}_${variant}`;
+  const cached = knightBitmapCache.get(cacheKey);
+  if (cached) return cached;
+
+  const rows = KNIGHT_SPRITE_FRAMES[frameKey] ?? KNIGHT_SPRITE_FRAMES.idle;
+  const h = rows.length;
+  const w = rows[0]?.length ?? 68;
+  const off = document.createElement('canvas');
+  off.width = w;
+  off.height = h;
+  const octx = off.getContext('2d');
+  if (!octx) return null;
+
+  for (let r = 0; r < h; r++) {
+    const line = rows[r];
+    for (let c = 0; c < w; c++) {
+      const ch = line[c];
+      if (ch === '.') continue;
+      if (ch === 'W') {
+        octx.fillStyle = '#ffffff';
+      } else {
+        octx.fillStyle =
+          variant === 'hurt'
+            ? '#525266'
+            : variant === 'ghost'
+              ? 'rgba(0, 0, 0, 0.35)'
+              : '#000000';
+      }
+      octx.fillRect(c, r, 1, 1);
+    }
+  }
+
+  knightBitmapCache.set(cacheKey, off);
+  return off;
+}
+
 export function drawRoaringKnight(
   ctx: CanvasRenderingContext2D,
   knight: KnightState,
@@ -518,285 +562,117 @@ export function drawRoaringKnight(
   y: number,
   time: number
 ): void {
-  // 1. Monochrome white-outline ghost afterimages (exact Deltarune Ch.3 effect!)
+  const frameKey =
+    knight.pose === 'point'
+      ? 'point'
+      : knight.pose === 'raise_sword'
+        ? 'raise_sword'
+        : knight.pose === 'slash'
+          ? 'slash'
+          : knight.pose === 'roar'
+            ? 'roar'
+            : 'idle';
+
+  // 1. Monochrome white-outline ghost afterimages trailing behind the exact 68x65 sprite!
   for (let i = 3; i >= 1; i--) {
     const lag = i * 0.12;
-    const ax = x + Math.sin((time - lag) * 2.1) * 7 + i * 5;
-    const ay = y + Math.sin((time - lag) * 3.3) * 8;
+    const ax = x + Math.sin((time - lag) * 2.1) * 6 + i * 5;
+    const ay = y + Math.sin((time - lag) * 3.2) * 7;
     ctx.save();
-    ctx.globalAlpha = 0.22 / i;
-    drawKnightAnatomy(ctx, knight, ax, ay, time - lag, true);
+    ctx.globalAlpha = 0.24 / i;
+    drawKnightPixelSprite(ctx, frameKey, 'ghost', ax, ay, knight, time - lag, true);
     ctx.restore();
   }
 
   const shakeX = knight.shakeTimer > 0 ? (Math.random() - 0.5) * 10 : 0;
   const hoverX = Math.sin(time * 2.1) * 4 + shakeX;
-  const hoverY = Math.sin(time * 3.3) * 7;
+  const hoverY = Math.sin(time * 3.2) * 6;
 
-  // Dark pool shadow on the snowy ground below the levitating Knight
+  // Dark shadow pool on the snowy ground directly under the vertical needle-leg (gx = 41)
   if (knight.pose !== 'roar') {
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.beginPath();
-    ctx.ellipse(x + hoverX, y + 84, 28, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + hoverX + 4, y + 76, 26, 6, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  drawKnightAnatomy(ctx, knight, x + hoverX, y + hoverY, time, false);
+  const isHurtFlash =
+    knight.pose === 'hurt' && Math.floor(time * 30) % 2 === 0;
+  drawKnightPixelSprite(
+    ctx,
+    frameKey,
+    isHurtFlash ? 'hurt' : 'normal',
+    x + hoverX,
+    y + hoverY,
+    knight,
+    time,
+    false
+  );
 }
 
-function drawKnightAnatomy(
+function drawKnightPixelSprite(
   ctx: CanvasRenderingContext2D,
-  knight: KnightState,
+  frameKey: string,
+  variant: 'normal' | 'ghost' | 'hurt',
   x: number,
   y: number,
+  knight: KnightState,
   time: number,
   isAfterimage: boolean
 ): void {
-  ctx.save();
-  ctx.translate(Math.round(x), Math.round(y));
+  const scale = 2; // Exact Deltarune 2x pixel scale (68x65 -> 136x130 on 640x480)
+  const anchorGx = 39;
+  const anchorGy = 32;
+  const drawX = Math.round(x - anchorGx * scale);
+  const drawY = Math.round(y - anchorGy * scale);
 
-  const edge = '#ffffff';
-  const body =
-    !isAfterimage && knight.pose === 'hurt' && Math.floor(time * 30) % 2 === 0
-      ? '#444444'
-      : '#000000';
-
-  ctx.lineJoin = 'miter';
-  ctx.miterLimit = 6;
-  ctx.strokeStyle = edge;
-  ctx.fillStyle = body;
-  ctx.lineWidth = isAfterimage ? 1.5 : 2;
-
-  // Dripping/rising pitch-black fountain droplets with white rim
+  // Rising dark fountain pixel motes behind torso
   if (!isAfterimage) {
     for (let i = 0; i < 4; i++) {
-      const p = ((time * 1.4 + i * 0.25) % 1);
-      const dx = Math.sin(time * 3 + i * 2) * 16;
-      const dy = -15 - p * 46;
-      const sz = Math.max(2, Math.round((1 - p) * 6));
-      px(ctx, dx - sz / 2 - 1, dy - 1, sz + 2, sz + 2, '#ffffff');
-      px(ctx, dx - sz / 2, dy, sz, sz, '#000000');
+      const p = (time * 1.3 + i * 0.25) % 1;
+      const mx = Math.round(x + Math.sin(time * 3 + i * 2.1) * 14);
+      const my = Math.round(y - 12 - p * 44);
+      const sz = p < 0.5 ? 4 : 2;
+      px(ctx, mx - 2, my - 2, sz + 4, sz + 4, '#ffffff');
+      px(ctx, mx, my, sz, sz, '#000000');
     }
   }
 
-  // 1. Pointy footless marionette legs + jagged hip spikes!
-  ctx.beginPath();
-  // Jagged hip girdle
-  ctx.moveTo(-15, 8);
-  ctx.lineTo(-22, 15); // left hip spike
-  ctx.lineTo(-12, 18);
-  ctx.lineTo(-15, 68); // needle-thin left leg point (no foot!)
-  ctx.lineTo(-6, 22);
-  ctx.lineTo(0, 16);
-  ctx.lineTo(6, 22);
-  ctx.lineTo(15, 70); // needle-thin right leg point (no foot!)
-  ctx.lineTo(12, 18);
-  ctx.lineTo(22, 15); // right hip spike
-  ctx.lineTo(15, 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 2. Extremely thin wasp-waist & Huge Triangular Shoulder Pauldrons!
-  ctx.beginPath();
-  ctx.moveTo(-38, -32); // sharp left triangular pauldron tip!
-  ctx.lineTo(-10, -34);
-  ctx.lineTo(10, -34);
-  ctx.lineTo(38, -32); // sharp right triangular pauldron tip!
-  ctx.lineTo(15, -14);
-  ctx.lineTo(4, 8); // razor-thin waist!
-  ctx.lineTo(-4, 8);
-  ctx.lineTo(-15, -14);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Stark white ribcage / sternum slits on torso
-  if (!isAfterimage) {
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-9, -22);
-    ctx.lineTo(0, -17);
-    ctx.lineTo(9, -22);
-    ctx.moveTo(-6, -14);
-    ctx.lineTo(0, -10);
-    ctx.lineTo(6, -14);
-    ctx.stroke();
-    ctx.lineWidth = 2;
-  }
-
-  // 3. Diamond-Shaped Frog-Mouth Helmet + Two 3-Pointed Antler Horns!
-  // Left 3-pointed antler horn
-  ctx.beginPath();
-  ctx.moveTo(-8, -50);
-  ctx.lineTo(-20, -68);
-  ctx.lineTo(-32, -74); // prong 1
-  ctx.lineTo(-21, -73);
-  ctx.lineTo(-29, -92); // prong 2 (tallest)
-  ctx.lineTo(-17, -77);
-  ctx.lineTo(-14, -88); // prong 3 (inner)
-  ctx.lineTo(-11, -68);
-  ctx.lineTo(-4, -53);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Right 3-pointed antler horn
-  ctx.beginPath();
-  ctx.moveTo(8, -50);
-  ctx.lineTo(20, -68);
-  ctx.lineTo(32, -74); // prong 1
-  ctx.lineTo(21, -73);
-  ctx.lineTo(29, -92); // prong 2 (tallest)
-  ctx.lineTo(17, -77);
-  ctx.lineTo(14, -88); // prong 3 (inner)
-  ctx.lineTo(11, -68);
-  ctx.lineTo(4, -53);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Diamond-shaped Frog-Mouth Helm
-  ctx.beginPath();
-  ctx.moveTo(0, -63); // top diamond point
-  ctx.lineTo(15, -47); // right helm cheek point
-  ctx.lineTo(0, -33); // sharp lower chin point
-  ctx.lineTo(-15, -47); // left helm cheek point
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Shifting White Visor / Mouth-Eye Opening!
-  if (!isAfterimage) {
-    ctx.fillStyle = '#ffffff';
-    if (knight.pose === 'roar') {
-      // Blazing full-cross star glare!
-      px(ctx, -26, -48, 52, 4, '#ffffff');
-      px(ctx, -2, -68, 4, 42, '#ffffff');
-      px(ctx, -8, -52, 16, 12, '#ffffff');
-    } else {
-      // Iconic jagged smiling-eye visor slit inside the diamond helm!
-      ctx.beginPath();
-      ctx.moveTo(-10, -48);
-      ctx.lineTo(-3, -43);
-      ctx.lineTo(3, -43);
-      ctx.lineTo(10, -48);
-      ctx.lineTo(4, -46);
-      ctx.lineTo(0, -49);
-      ctx.lineTo(-4, -46);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    if (knight.phase4Completed || knight.pose === 'cracked') {
-      ctx.strokeStyle = '#ff1744';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-3, -59);
-      ctx.lineTo(3, -47);
-      ctx.lineTo(-2, -36);
-      ctx.stroke();
-      ctx.strokeStyle = edge;
-    }
-  }
-
-  // 4. Left Arm & Clawed Hand with the WHITE PALM HOLE!
-  ctx.save();
-  if (knight.pose === 'point') {
-    ctx.translate(-22, -25);
-    ctx.rotate(0.1);
-    ctx.beginPath();
-    ctx.moveTo(0, -4);
-    ctx.lineTo(-36, -3);
-    ctx.lineTo(-48, -7); // top claw
-    ctx.lineTo(-42, 0);
-    ctx.lineTo(-50, 2); // middle pointing claw
-    ctx.lineTo(-40, 5);
-    ctx.lineTo(-45, 9); // bottom claw
-    ctx.lineTo(-34, 5);
-    ctx.lineTo(0, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // Signature White Hole in Palm!
-    if (!isAfterimage) {
-      px(ctx, -39, -1, 5, 5, '#ffffff');
-      px(ctx, -55, 0, 5, 5, '#e879f9');
-    }
+  const bmp = getKnightBitmap(frameKey, variant);
+  if (bmp) {
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(bmp, drawX, drawY, bmp.width * scale, bmp.height * scale);
+    ctx.imageSmoothingEnabled = prevSmooth;
   } else {
-    ctx.translate(-24, -25);
-    ctx.rotate(knight.pose === 'roar' ? 0.75 : 0.25);
-    ctx.beginPath();
-    ctx.moveTo(-3, 0);
-    ctx.lineTo(-7, 26);
-    ctx.lineTo(-12, 36); // claws
-    ctx.lineTo(-5, 32);
-    ctx.lineTo(-3, 39);
-    ctx.lineTo(1, 31);
-    ctx.lineTo(5, 36);
-    ctx.lineTo(4, 25);
-    ctx.lineTo(3, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // White Hole in Palm!
-    if (!isAfterimage) {
-      px(ctx, -4, 26, 5, 5, '#ffffff');
+    const rows = KNIGHT_SPRITE_FRAMES[frameKey] ?? KNIGHT_SPRITE_FRAMES.idle;
+    drawPixelMatrix(ctx, drawX, drawY, scale, rows, {
+      W: '#ffffff',
+      B: variant === 'hurt' ? '#525266' : '#000000'
+    });
+  }
+
+  if (!isAfterimage) {
+    // Glowing star spark at fingertip during Stars 'point' pose
+    if (frameKey === 'point') {
+      const pulse = Math.floor(time * 16) % 2 === 0 ? '#ffffff' : '#e879f9';
+      px(ctx, drawX + 6 * scale, drawY + 23 * scale, 6, 6, pulse);
+      px(ctx, drawX + 7 * scale, drawY + 21 * scale, 2, 10, '#ffffff');
+      px(ctx, drawX + 4 * scale, drawY + 24 * scale, 10, 2, '#ffffff');
+    }
+
+    // Fractured crimson crack on visor & Black Blade once Phase 4 is survived!
+    if (knight.phase4Completed || knight.pose === 'cracked') {
+      px(ctx, drawX + 35 * scale, drawY + 15 * scale, 2, 4, '#ff1744');
+      px(ctx, drawX + 36 * scale, drawY + 17 * scale, 2, 6, '#ff1744');
+      if (frameKey === 'idle' || frameKey === 'point') {
+        px(ctx, drawX + 14 * scale, drawY + 32 * scale, 2, 6, '#ff1744');
+        px(ctx, drawX + 15 * scale, drawY + 35 * scale, 2, 6, '#ff1744');
+      }
     }
   }
-  ctx.restore();
-
-  // 5. Right Arm + Curved/Jagged BLACK KNIFE / BLACK BLADE!
-  ctx.save();
-  let swordAngle = -0.58;
-  if (knight.pose === 'raise_sword') swordAngle = -2.18;
-  else if (knight.pose === 'slash') swordAngle = 0.88;
-  else if (knight.pose === 'roar') swordAngle = -1.57;
-
-  ctx.translate(24, -25);
-  ctx.rotate(swordAngle);
-
-  // Slender right arm
-  ctx.beginPath();
-  ctx.moveTo(-3, -2);
-  ctx.lineTo(-4, 22);
-  ctx.lineTo(4, 22);
-  ctx.lineTo(3, -2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // The Black Knife / Sword (Pitch-black blade, jagged fuller notch, stark white edge)
-  ctx.translate(0, 20);
-  ctx.beginPath();
-  ctx.moveTo(-12, 0); // sharp swept crossguard
-  ctx.lineTo(12, -2);
-  ctx.lineTo(4, 4);
-  ctx.lineTo(8, 56);
-  ctx.lineTo(2, 86); // wicked curved tip!
-  ctx.lineTo(-5, 62);
-  ctx.lineTo(-2, 54); // jagged blade notch!
-  ctx.lineTo(-6, 48);
-  ctx.lineTo(-4, 4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  if (!isAfterimage && (knight.phase4Completed || knight.pose === 'cracked')) {
-    ctx.strokeStyle = '#ff1744';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-4, 40);
-    ctx.lineTo(4, 46);
-    ctx.lineTo(-2, 54);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  ctx.restore();
 }
 
 // ============================================================================
